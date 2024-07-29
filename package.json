@@ -10,5 +10,6 @@
     "dotenv": "^16.0.0",
     "openai": "^3.0.0"
   },
-  "author": "MoPaMo"
+  "author": "MoPaMo",
+  "license": "SEE LICENSE IN LICENSE.md"
 }
