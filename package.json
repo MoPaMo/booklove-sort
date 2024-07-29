@@ -1,0 +1,14 @@
+{
+  "name": "book-sorter",
+  "version": "1.0.0",
+  "description": "A script to categorize books using the OpenAI API",
+  "main": "sorter.js",
+  "scripts": {
+    "start": "node sorter.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.0.0",
+    "openai": "^3.0.0"
+  },
+  "author": "MoPaMo"
+}
