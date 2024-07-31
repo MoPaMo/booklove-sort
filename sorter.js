@@ -15,13 +15,14 @@ async function categorizeBook(name, description, releaseYear, author) {
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini-2024-07-18",
       messages: [
-        { role: "system", content: `Choose up to three categories that best fit the book: ${categories.join(', ')}` },
+        { role: "system", content: `You are a helpful assistant designed to output JSON. Choose up to three categories that best fit the book: ${categories.join(', ')}` },
         { role: "user", content: `Book Information:\nName: ${name}\nDescription: ${description}\nRelease Year: ${releaseYear}\nAuthor: ${author}` }
-      ]
+      ],
+      response_format: { type: "json_object" }
     });
 
-    const categoriesResponse = completion.choices[0].message.content;
-    console.log(`Selected Categories: ${categoriesResponse}`);
+    const categoriesResponse = completion.choices[0].message.content.categories;
+    console.log(`Selected Categories: ${categoriesResponse.join(', ')}`);
   } catch (error) {
     console.error('Error:', error);
   }
