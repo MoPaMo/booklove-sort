@@ -1,11 +1,8 @@
-require('dotenv').config();
-const { Configuration, OpenAIApi } = require('openai');
+import OpenAI from "openai";
 
-const configuration = new Configuration({
+const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
-
-const openai = new OpenAIApi(configuration);
 
 const categories = [
   "Non-Fiction", "Mystery", "Young Adults", "Classics", "Adventure", "Horror", 
@@ -14,22 +11,20 @@ const categories = [
 ];
 
 async function categorizeBook(name, description, releaseYear, author) {
-  
-
   try {
-    
-const completion = await openai.chat.completions.create({
-    messages: [{ role: "system", content: `Choose up to three categories that best fit the book:${categories.join(', ')}`}],
-    model: "gpt-4o-mini-2024-07-18",
-  }, {role:"user", content:`Book Information:\nName: ${name}\nDescription: ${description}\nRelease Year: ${releaseYear}\nAuthor: ${author}`}]});
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4o-mini-2024-07-18",
+      messages: [
+        { role: "system", content: `Choose up to three categories that best fit the book: ${categories.join(', ')}` },
+        { role: "user", content: `Book Information:\nName: ${name}\nDescription: ${description}\nRelease Year: ${releaseYear}\nAuthor: ${author}` }
+      ]
+    });
 
-
-    const categoriesResponse = completion.choices[0];
+    const categoriesResponse = completion.choices[0].message.content;
     console.log(`Selected Categories: ${categoriesResponse}`);
   } catch (error) {
     console.error('Error:', error);
   }
-  
 }
 
 // debug
