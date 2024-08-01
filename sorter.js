@@ -1,8 +1,10 @@
-import OpenAI from "openai";
+const { Configuration, OpenAIApi } = require("openai");
 
-const openai = new OpenAI({
+const configuration = new Configuration({
   apiKey: process.env.OPENAI_API_KEY,
 });
+const openai = new OpenAIApi(configuration);
+
 
 const categories = [
   "Non-Fiction", "Mystery", "Young Adults", "Classics", "Adventure", "Horror", 
@@ -13,7 +15,7 @@ const categories = [
 async function categorizeBook(name, description, releaseYear, author) {
   try {
     const completion = await openai.chat.completions.create({
-      model: "gpt-4o-mini-2024-07-18",
+      model: "gpt-4o-mini",
       messages: [
         { role: "system", content: `You are a helpful assistant designed to output JSON. Choose up to three categories that best fit the book: ${categories.join(', ')}` },
         { role: "user", content: `Book Information:\nName: ${name}\nDescription: ${description}\nRelease Year: ${releaseYear}\nAuthor: ${author}` }
