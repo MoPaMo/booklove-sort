@@ -1,39 +1,56 @@
-const { Configuration, OpenAIApi } = require("openai");
+const axios = require('axios');
 
-const configuration = new Configuration({
-  apiKey: process.env.OPENAI_API_KEY,
-});
-const openai = new OpenAIApi(configuration);
-
-
-const categories = [
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+const CATEGORIES = [
   "Non-Fiction", "Mystery", "Young Adults", "Classics", "Adventure", "Horror", 
   "Self-Help", "LGBT+", "Romance", "Thriller", "Fantasy", "Sci-Fi", 
   "Comedy", "Historical", "Biography", "Philosophy"
 ];
 
-async function categorizeBook(name, description, releaseYear, author) {
+async function getBookGenres(name, description, author, releaseDate) {
+  const prompt = `
+    Given the following book details:
+    Name: ${name}
+    Description: ${description}
+    Author: ${author}
+    Release Date: ${releaseDate}
+
+    Please assign up to three genres from the following list: ${CATEGORIES.join(", ")}. 
+    Return the genres as an array of strings.
+  `;
+
   try {
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [
-        { role: "system", content: `You are a helpful assistant designed to output JSON. Choose up to three categories that best fit the book: ${categories.join(', ')}` },
-        { role: "user", content: `Book Information:\nName: ${name}\nDescription: ${description}\nRelease Year: ${releaseYear}\nAuthor: ${author}` }
-      ],
-      response_format: { type: "json_object" }
+    const response = await axios.post('https://api.openai.com/v1/engines/gpt-4o-mini/completions', {
+      prompt: prompt,
+      max_tokens: 100,
+      n: 1,
+      stop: null,
+      temperature: 0.7,
+    }, {
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${OPENAI_API_KEY}`,
+      }
     });
 
-    const categoriesResponse = completion.choices[0].message.content.categories;
-    console.log(`Selected Categories: ${categoriesResponse.join(', ')}`);
+    const completion = response.data.choices[0].text.trim();
+    const genres = completion.split(',').map(genre => genre.trim()).filter(genre => CATEGORIES.includes(genre));
+
+    return genres;
   } catch (error) {
-    console.error('Error:', error);
+    console.error('Error fetching genres from OpenAI:', error);
+    return [];
   }
 }
 
-// debug
-categorizeBook(
-  "To Kill a Mockingbird",
-  "A novel about the serious issues of rape and racial inequality.",
-  1960,
-  "Harper Lee"
-);
+// Example usage
+const bookDetails = {
+  name: 'To Kill a Mockingbird',
+  description: 'A novel about the serious issues of rape and racial inequality.',
+  author: 'Harper Lee',
+  releaseDate: '1960-07-11'
+};
+
+getBookGenres(bookDetails.name, bookDetails.description, bookDetails.author, bookDetails.releaseDate)
+  .then(genres => console.log('Assigned Genres:', genres))
+  .catch(error => console.error('Error:', error));

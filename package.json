@@ -7,6 +7,7 @@
     "start": "node sorter.js"
   },
   "dependencies": {
+    "axios": "^1.7.2",
     "dotenv": "^16.0.0",
     "openai": "^3.0.0"
   },
