@@ -4,7 +4,7 @@ const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const CATEGORIES = [
   "Non-Fiction", "Mystery", "Young Adults", "Classics", "Adventure", "Horror", 
   "Self-Help", "LGBT+", "Romance", "Thriller", "Fantasy", "Sci-Fi", 
-  "Comedy", "Historical", "Biography", "Philosophy"
+  "Comedy", "Historical", "Biography", "Philosophy", "Uncategorized"
 ];
 
 async function getBookGenres(name, description, author, releaseDate) {
@@ -15,8 +15,8 @@ async function getBookGenres(name, description, author, releaseDate) {
     Author: ${author}
     Release Date: ${releaseDate}
 
-    Please assign one, maximum three genres from the following list: ${CATEGORIES.join(", ")}. 
-    Return the genres as an array of strings in JSON. 
+    Please assign one, if necessary up to 3 genres: ${CATEGORIES.join(", ")}. 
+    Return as an array of strings named genres in JSON. order by importance
   `;
 
   try {
@@ -27,6 +27,8 @@ async function getBookGenres(name, description, author, releaseDate) {
       n: 1,
       stop: null,
       temperature: 0.7,
+      response_format: { type: "json_object" },
+      
     }, {
       headers: {
         'Content-Type': 'application/json',
@@ -36,8 +38,7 @@ async function getBookGenres(name, description, author, releaseDate) {
 
     const completion = response.data.choices[0].message.content.trim();
     console.log(completion);
-    const genres = JSON.parse(completion)
-
+    const genres = JSON.parse(completion).genres
     return genres;
   } catch (error) {
     console.error('Error fetching genres from OpenAI:', error.response ? error.response.data : error.message);
@@ -47,10 +48,10 @@ async function getBookGenres(name, description, author, releaseDate) {
 
 // Example usage
 const bookDetails = {
-  name: 'To Kill a Mockingbird',
-  description: 'A novel about the serious issues of rape and racial inequality.',
-  author: 'Harper Lee',
-  releaseDate: '1960-07-11'
+  name: 'Lord Of The Rings',
+  description: '',
+  author: 'JRRTolkien',
+  releaseDate: ''
 };
 
 getBookGenres(bookDetails.name, bookDetails.description, bookDetails.author, bookDetails.releaseDate)
