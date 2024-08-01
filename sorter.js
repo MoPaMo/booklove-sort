@@ -15,13 +15,14 @@ async function getBookGenres(name, description, author, releaseDate) {
     Author: ${author}
     Release Date: ${releaseDate}
 
-    Please assign up to three genres from the following list: ${CATEGORIES.join(", ")}. 
-    Return the genres as an array of strings.
+    Please assign one, maximum three genres from the following list: ${CATEGORIES.join(", ")}. 
+    Return the genres as an array of strings in JSON. 
   `;
 
   try {
-    const response = await axios.post('https://api.openai.com/v1/engines/gpt-4o-mini/completions', {
-      prompt: prompt,
+    const response = await axios.post('https://api.openai.com/v1/chat/completions', {
+      model: 'gpt-4o-mini',
+      messages: [{ role: 'user', content: prompt }],
       max_tokens: 100,
       n: 1,
       stop: null,
@@ -33,12 +34,13 @@ async function getBookGenres(name, description, author, releaseDate) {
       }
     });
 
-    const completion = response.data.choices[0].text.trim();
-    const genres = completion.split(',').map(genre => genre.trim()).filter(genre => CATEGORIES.includes(genre));
+    const completion = response.data.choices[0].message.content.trim();
+    console.log(completion);
+    const genres = JSON.parse(completion)
 
     return genres;
   } catch (error) {
-    console.error('Error fetching genres from OpenAI:', error);
+    console.error('Error fetching genres from OpenAI:', error.response ? error.response.data : error.message);
     return [];
   }
 }
