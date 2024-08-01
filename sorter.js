@@ -1,4 +1,6 @@
+const { Client } = require('pg');
 const axios = require('axios');
+const { v4: uuidv4 } = require('uuid');
 
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const CATEGORIES = [
@@ -28,7 +30,7 @@ async function getBookGenres(name, description, author, releaseDate) {
       stop: null,
       temperature: 0.7,
       response_format: { type: "json_object" },
-      
+
     }, {
       headers: {
         'Content-Type': 'application/json',
@@ -37,8 +39,7 @@ async function getBookGenres(name, description, author, releaseDate) {
     });
 
     const completion = response.data.choices[0].message.content.trim();
-    console.log(completion);
-    const genres = JSON.parse(completion).genres
+    const genres = JSON.parse(completion).genres;
     return genres;
   } catch (error) {
     console.error('Error fetching genres from OpenAI:', error.response ? error.response.data : error.message);
@@ -46,26 +47,56 @@ async function getBookGenres(name, description, author, releaseDate) {
   }
 }
 
-// Example usage
-const bookDetails = {
-  name: 'Lord Of The Rings',
-  description: '',
-  author: 'JRRTolkien',
-  releaseDate: ''
-};
+const client = new Client({
+  connectionString: process.env.DATABASE_URL,
+});
 
-getBookGenres(bookDetails.name, bookDetails.description, bookDetails.author, bookDetails.releaseDate)
-  .then(genres => console.log('Assigned Genres:', genres))
+async function fetchBooksWithoutGenres() {
+  await client.connect();
+  const res = await client.query(`
+    SELECT b.id, b.title, b.description, b.author, b.release_year 
+    FROM books b
+    LEFT JOIN bookgenres bg ON b.id = bg.book_id
+    WHERE bg.book_id IS NULL;
+  `);
+  await client.end();
+  return res.rows;
+}
+
+async function processBooksAndAddGenres() {
+  const books = await fetchBooksWithoutGenres();
+
+  for (const book of books) {
+    const genres = await getBookGenres(book.title, book.description, book.author, book.release_year);
+    await addGenresToBook(book.id, genres);
+  }
+}
+
+async function addGenresToBook(bookId, genres) {
+  await client.connect();
+
+  for (const genreName of genres) {
+    let genreId = await getGenreId(genreName);
+    if (!genreId) {
+      genreId = await createGenre(genreName);
+    }
+    await client.query('INSERT INTO bookgenres (id, book_id, genre_id) VALUES ($1, $2, $3)', [uuidv4(), bookId, genreId]);
+  }
+
+  await client.end();
+}
+
+async function getGenreId(genreName) {
+  const res = await client.query('SELECT id FROM genres WHERE name = $1', [genreName]);
+  return res.rows[0] ? res.rows[0].id : null;
+}
+
+async function createGenre(genreName) {
+  const id = uuidv4();
+  await client.query('INSERT INTO genres (id, name) VALUES ($1, $2)', [id, genreName]);
+  return id;
+}
+
+processBooksAndAddGenres()
+  .then(() => console.log('Finished processing books and adding genres.'))
   .catch(error => console.error('Error:', error));
-
-getBookGenres("It starts with us", "", "Colleen Hoover", "2023-01-01").then(genres => console.log(genres))
-getBookGenres("To Kill a Mockingbird", "", "Harper Lee", "1960-07-11").then(genres => console.log("To Kill a Mockingbird:", genres));
-getBookGenres("1984", "", "George Orwell", "1949-06-08").then(genres => console.log("1984:", genres));
-getBookGenres("Pride and Prejudice", "", "Jane Austen", "1813-01-28").then(genres => console.log("Pride and Prejudice:", genres));
-getBookGenres("The Great Gatsby", "", "F. Scott Fitzgerald", "1925-04-10").then(genres => console.log("The Great Gatsby:", genres));
-getBookGenres("The Catcher in the Rye", "", "J.D. Salinger", "1951-07-16").then(genres => console.log("The Catcher in the Rye:", genres));
-getBookGenres("Moby Dick", "", "Herman Melville", "1851-10-18").then(genres => console.log("Moby Dick:", genres));
-getBookGenres("Frankenstein", "", "Mary Shelley", "1818-01-01").then(genres => console.log("Frankenstein:", genres));
-getBookGenres("Brave New World", "", "Aldous Huxley", "1932-08-01").then(genres => console.log("Brave New World:", genres));
-getBookGenres("The Hobbit", "", "J.R.R. Tolkien", "1937-09-21").then(genres => console.log("The Hobbit:", genres));
-getBookGenres("Weird Data", "A story of unconventional data", "Different Author", "2022-12-12").then(genres => console.log("Weird Data:", genres));
