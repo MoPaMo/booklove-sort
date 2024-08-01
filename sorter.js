@@ -4,7 +4,7 @@ const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const CATEGORIES = [
   "Non-Fiction", "Mystery", "Young Adults", "Classics", "Adventure", "Horror", 
   "Self-Help", "LGBT+", "Romance", "Thriller", "Fantasy", "Sci-Fi", 
-  "Comedy", "Historical", "Biography", "Philosophy", "Uncategorized"
+  "Comedy", "Historical", "Biography", "Philosophy"
 ];
 
 async function getBookGenres(name, description, author, releaseDate) {
@@ -15,8 +15,8 @@ async function getBookGenres(name, description, author, releaseDate) {
     Author: ${author}
     Release Date: ${releaseDate}
 
-    Please assign one, if necessary up to 3 genres: ${CATEGORIES.join(", ")}. 
-    Return as an array of strings named genres in JSON. order by importance
+    Please assign two +- one genres: ${CATEGORIES.join(", ")}. 
+    Return as an array of strings named genres in JSON. order by importance, use Uncategorized if no genre matches
   `;
 
   try {
@@ -57,3 +57,5 @@ const bookDetails = {
 getBookGenres(bookDetails.name, bookDetails.description, bookDetails.author, bookDetails.releaseDate)
   .then(genres => console.log('Assigned Genres:', genres))
   .catch(error => console.error('Error:', error));
+
+getBookGenres("It starts with us", "", "Colleen Hoover", "2023-01-01").then(genres => console.log(genres))
