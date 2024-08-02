@@ -57,7 +57,7 @@ async function fetchBooksWithoutGenres(client) {
     SELECT b.id, b.title, b.description, b.author, b.release_year 
     FROM books b
     LEFT JOIN bookgenres bg ON b.id = bg.book_id
-    WHERE bg.book_id IS NULL;
+    WHERE bg.book_id IS NULL LIMIT 69;
   `);
   return res.rows;
 }
@@ -66,7 +66,7 @@ async function processBooksAndAddGenres() {
   const client = await pool.connect();
   try {
     const books = await fetchBooksWithoutGenres(client);
-
+console.log(`Processing  ${books.length} books for genre addition...`);
     for (const book of books) {
       const genres = await getBookGenres(book.title, book.description, book.author, book.release_year);
       await addGenresToBook(client, book.id, genres);
