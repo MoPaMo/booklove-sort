@@ -1,4 +1,4 @@
-const { Client } = require('pg');
+const { Pool } = require('pg');
 const axios = require('axios');
 const { v4: uuidv4 } = require('uuid');
 
@@ -18,7 +18,7 @@ async function getBookGenres(name, description, author, releaseDate) {
     Release Date: ${releaseDate}
 
     Please assign two +- one genres: ${CATEGORIES.join(", ")}. 
-    Return as an array of strings named genres in JSON. order by importance, use Uncategorized if no genre matches
+    Return as an array of strings named genres in JSON. Order by importance, use Uncategorized if no genre matches
   `;
 
   try {
@@ -47,20 +47,26 @@ async function getBookGenres(name, description, author, releaseDate) {
   }
 }
 
-const client = new Client({
+const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
+  ssl: {
+    rejectUnauthorized: false,
+  }
 });
 
 async function fetchBooksWithoutGenres() {
-  await client.connect();
-  const res = await client.query(`
-    SELECT b.id, b.title, b.description, b.author, b.release_year 
-    FROM books b
-    LEFT JOIN bookgenres bg ON b.id = bg.book_id
-    WHERE bg.book_id IS NULL;
-  `);
-  await client.end();
-  return res.rows;
+  const client = await pool.connect();
+  try {
+    const res = await client.query(`
+      SELECT b.id, b.title, b.description, b.author, b.release_year 
+      FROM books b
+      LEFT JOIN bookgenres bg ON b.id = bg.book_id
+      WHERE bg.book_id IS NULL;
+    `);
+    return res.rows;
+  } finally {
+    client.release();
+  }
 }
 
 async function processBooksAndAddGenres() {
@@ -73,25 +79,26 @@ async function processBooksAndAddGenres() {
 }
 
 async function addGenresToBook(bookId, genres) {
-  await client.connect();
-
-  for (const genreName of genres) {
-    let genreId = await getGenreId(genreName);
-    if (!genreId) {
-      genreId = await createGenre(genreName);
+  const client = await pool.connect();
+  try {
+    for (const genreName of genres) {
+      let genreId = await getGenreId(client, genreName);
+      if (!genreId) {
+        genreId = await createGenre(client, genreName);
+      }
+      await client.query('INSERT INTO bookgenres (id, book_id, genre_id) VALUES ($1, $2, $3)', [uuidv4(), bookId, genreId]);
     }
-    await client.query('INSERT INTO bookgenres (id, book_id, genre_id) VALUES ($1, $2, $3)', [uuidv4(), bookId, genreId]);
+  } finally {
+    client.release();
   }
-
-  await client.end();
 }
 
-async function getGenreId(genreName) {
+async function getGenreId(client, genreName) {
   const res = await client.query('SELECT id FROM genres WHERE name = $1', [genreName]);
   return res.rows[0] ? res.rows[0].id : null;
 }
 
-async function createGenre(genreName) {
+async function createGenre(client, genreName) {
   const id = uuidv4();
   await client.query('INSERT INTO genres (id, name) VALUES ($1, $2)', [id, genreName]);
   return id;
