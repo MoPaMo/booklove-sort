@@ -9,6 +9,13 @@ const CATEGORIES = [
   "Comedy", "Historical", "Biography", "Philosophy"
 ];
 
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: {
+    rejectUnauthorized: false,
+  }
+});
+
 async function getBookGenres(name, description, author, releaseDate) {
   const prompt = `
     Given the following book details:
@@ -18,7 +25,7 @@ async function getBookGenres(name, description, author, releaseDate) {
     Release Date: ${releaseDate}
 
     Please assign two +- one genres: ${CATEGORIES.join(", ")}. 
-    Return as an array of strings named genres in JSON. Order by importance, use Uncategorized if no genre matches
+    Return as an array of strings named genres in JSON. Order by importance, use Uncategorized if no genre matches.
   `;
 
   try {
@@ -28,9 +35,7 @@ async function getBookGenres(name, description, author, releaseDate) {
       max_tokens: 100,
       n: 1,
       stop: null,
-      temperature: 0.7,
-      response_format: { type: "json_object" },
-
+      temperature: 0.7, response_format: { type: "json_object" },
     }, {
       headers: {
         'Content-Type': 'application/json',
@@ -47,49 +52,39 @@ async function getBookGenres(name, description, author, releaseDate) {
   }
 }
 
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: {
-    rejectUnauthorized: false,
-  }
-});
-
-async function fetchBooksWithoutGenres() {
-  const client = await pool.connect();
-  try {
-    const res = await client.query(`
-      SELECT b.id, b.title, b.description, b.author, b.release_year 
-      FROM books b
-      LEFT JOIN bookgenres bg ON b.id = bg.book_id
-      WHERE bg.book_id IS NULL;
-    `);
-    return res.rows;
-  } finally {
-    client.release();
-  }
+async function fetchBooksWithoutGenres(client) {
+  const res = await client.query(`
+    SELECT b.id, b.title, b.description, b.author, b.release_year 
+    FROM books b
+    LEFT JOIN bookgenres bg ON b.id = bg.book_id
+    WHERE bg.book_id IS NULL;
+  `);
+  return res.rows;
 }
 
 async function processBooksAndAddGenres() {
-  const books = await fetchBooksWithoutGenres();
+  const client = await pool.connect();
+  try {
+    const books = await fetchBooksWithoutGenres(client);
 
-  for (const book of books) {
-    const genres = await getBookGenres(book.title, book.description, book.author, book.release_year);
-    await addGenresToBook(book.id, genres);
+    for (const book of books) {
+      const genres = await getBookGenres(book.title, book.description, book.author, book.release_year);
+      await addGenresToBook(client, book.id, genres);
+    }
+  } catch (error) {
+    console.error('Error processing books and adding genres:', error);
+  } finally {
+    client.release();
   }
 }
 
-async function addGenresToBook(bookId, genres) {
-  const client = await pool.connect();
-  try {
-    for (const genreName of genres) {
-      let genreId = await getGenreId(client, genreName);
-      if (!genreId) {
-        genreId = await createGenre(client, genreName);
-      }
-      await client.query('INSERT INTO bookgenres (id, book_id, genre_id) VALUES ($1, $2, $3)', [uuidv4(), bookId, genreId]);
+async function addGenresToBook(client, bookId, genres) {
+  for (const genreName of genres) {
+    let genreId = await getGenreId(client, genreName);
+    if (!genreId) {
+      genreId = await createGenre(client, genreName);
     }
-  } finally {
-    client.release();
+    await client.query('INSERT INTO bookgenres (id, book_id, genre_id) VALUES ($1, $2, $3)', [uuidv4(), bookId, genreId]);
   }
 }
 
@@ -104,6 +99,13 @@ async function createGenre(client, genreName) {
   return id;
 }
 
-processBooksAndAddGenres()
-  .then(() => console.log('Finished processing books and adding genres.'))
-  .catch(error => console.error('Error:', error));
+(async () => {
+  try {
+    await processBooksAndAddGenres();
+    console.log('Finished processing books and adding genres.');
+  } catch (error) {
+    console.error('Error:', error);
+  } finally {
+    pool.end();
+  }
+})();
